@@ -9,7 +9,7 @@ import (
 
 func readPump(c *domain.Client) {
 	for {
-		mt, msg, err := c.Conn.ReadMessage()
+		_, _, err := c.Conn.ReadMessage()
 		if err != nil {
 			log.Println("read:", err)
 			return
@@ -21,10 +21,12 @@ func writePump(ctx context.Context, c *domain.Client) {
 	for {
 		select {
 		case <-ctx.Done():
+			return
 		case msg, ok := <-c.MsgQueue:
 			if !ok {
-
+				return
 			}
+
 		}
 	}
 

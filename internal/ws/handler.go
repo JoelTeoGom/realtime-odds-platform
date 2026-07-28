@@ -3,7 +3,6 @@ package ws
 import (
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 
 	"main/internal/domain"
@@ -25,8 +24,10 @@ func Handler(h *hub.Hub) http.HandlerFunc {
 			return
 		}
 
-		client := &domain.Client{
-			Id: uuid.NewString(),
-		}
+		msqQueue := make(chan domain.Event, 50)
+		defer close(msqQueue)
+
+		client := domain.NewClient(conn, msqQueue)
+
 	}
 }
