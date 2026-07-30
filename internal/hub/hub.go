@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"context"
 	"hash/fnv"
 
 	"github.com/JoelTeoGom/go-sharded-ws-hub/internal/ports/inbound"
@@ -24,10 +25,15 @@ func NewHub(nShards int) *Hub {
 		shards[i] = newShard()
 	}
 
-	return &Hub{
+	h := &Hub{
 		nShards: nShards,
 		shards:  shards,
 	}
+
+	// debug only: dumps the shard maps every 10s.
+	go h.MonitorHubData(context.Background())
+
+	return h
 }
 
 // shardFor always maps a topic to the same shard.

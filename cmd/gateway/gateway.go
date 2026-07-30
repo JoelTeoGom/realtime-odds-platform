@@ -5,12 +5,15 @@ import (
 	"net/http"
 
 	"github.com/JoelTeoGom/go-sharded-ws-hub/internal/adapters/inbound/ws"
+	"github.com/JoelTeoGom/go-sharded-ws-hub/internal/hub"
 )
 
-func main() {
-	h := hub.New()
+func NewGateway() {
+	//hub creation with 5 shards + settings
+	hub := hub.NewHub(5)
+	handlerCfg := ws.NewHandler(hub)
 
-	handlerCfg := ws.NewHandler(h)
+	//Endpoints
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", handlerCfg.WsHandler())
 

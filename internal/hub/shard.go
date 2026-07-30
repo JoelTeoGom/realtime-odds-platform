@@ -6,7 +6,6 @@ import (
 	"github.com/JoelTeoGom/go-sharded-ws-hub/internal/ports/outbound"
 )
 
-
 type Shard struct {
 	mu   sync.RWMutex
 	subs map[string]map[string]outbound.Client
@@ -14,7 +13,8 @@ type Shard struct {
 
 func newShard() *Shard {
 	return &Shard{
-		subs: make(map[string]map[string]outbound.Client)
+		subs: make(map[string]map[string]outbound.Client),
+		mu:   sync.RWMutex{},
 	}
 }
 

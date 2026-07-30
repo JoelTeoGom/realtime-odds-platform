@@ -27,14 +27,6 @@ func NewHandler(hub inbound.Hub) *Handler {
 	}
 }
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
-
 func (h *Handler) WsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := h.upgrader.Upgrade(w, r, nil)
