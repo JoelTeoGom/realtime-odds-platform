@@ -1,0 +1,13 @@
+# Claude Code
+.claude/
+
+# Binarios compilados
+/gateway/gateway
+/ingestion/ingestion
+*.exe
+*.test
+*.out
+
+# Entorno local
+.env
+.env.local

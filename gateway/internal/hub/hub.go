@@ -4,13 +4,14 @@ import (
 	"context"
 	"hash/fnv"
 
-	"github.com/JoelTeoGom/go-sharded-ws-hub/internal/ports/inbound"
-	"github.com/JoelTeoGom/go-sharded-ws-hub/internal/ports/outbound"
+	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/ports/inbound"
+	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/ports/outbound"
 )
 
 type Hub struct {
-	shards  []*Shard
-	nShards int
+	EventShards []*EventShard
+	ClientShard []*ClientShard
+	nShards     int
 }
 
 var _ inbound.Hub = (*Hub)(nil)
@@ -20,14 +21,18 @@ func NewHub(nShards int) *Hub {
 		nShards = 1
 	}
 
-	shards := make([]*Shard, nShards)
+	eventShards := make([]*EventShard, nShards)
+	clientShard := make([]*ClientShard, nShards)
 	for i := range shards {
-		shards[i] = newShard()
+		eventShards[i] = newEventShard()
+		clientShard[i] = newClientShard()
+
 	}
 
 	h := &Hub{
-		nShards: nShards,
-		shards:  shards,
+		nShards:     nShards,
+		EventShards: eventShards,
+		ClientShard: clientShards,
 	}
 
 	// debug only: dumps the shard maps every 10s.

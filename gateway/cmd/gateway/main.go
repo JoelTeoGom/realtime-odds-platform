@@ -1,14 +1,14 @@
-package gateway
+package main
 
 import (
 	"log"
 	"net/http"
 
-	"github.com/JoelTeoGom/go-sharded-ws-hub/internal/adapters/inbound/ws"
-	"github.com/JoelTeoGom/go-sharded-ws-hub/internal/hub"
+	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/adapters/inbound/ws"
+	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/hub"
 )
 
-func NewGateway() {
+func main() {
 	//hub creation with 5 shards + settings
 	hub := hub.NewHub(5)
 	handlerCfg := ws.NewHandler(hub)

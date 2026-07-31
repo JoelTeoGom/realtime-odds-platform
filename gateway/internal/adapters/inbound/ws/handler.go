@@ -5,7 +5,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/JoelTeoGom/go-sharded-ws-hub/internal/ports/inbound"
+	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/ports/inbound"
 )
 
 type Handler struct {

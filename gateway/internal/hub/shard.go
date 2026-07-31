@@ -3,18 +3,24 @@ package hub
 import (
 	"sync"
 
-	"github.com/JoelTeoGom/go-sharded-ws-hub/internal/ports/outbound"
+	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/ports/outbound"
 )
 
-type Shard struct {
-	mu   sync.RWMutex
-	subs map[string]map[string]outbound.Client
+type EventShard struct {
+	mu           sync.RWMutex
+	eventSubsMap map[string][]string
+}
+
+type ClientShard struct {
+	mu              sync.RWMutex
+	clientSocketMap map[string]outbound.Client
 }
 
 func newShard() *Shard {
 	return &Shard{
-		subs: make(map[string]map[string]outbound.Client),
-		mu:   sync.RWMutex{},
+		clientSocketMap: make(map[string]outbound.Client),
+		eventSubsMap:    make,
+		mu:              sync.RWMutex{},
 	}
 }
 

@@ -1,0 +1,9 @@
+go 1.24
+
+// Solo para desarrollo local en el monorepo: permite compilar y ejecutar los
+// dos modulos desde la raiz. Cada servicio sigue siendo autonomo (su go.mod
+// resuelve por su cuenta) y no hay ningun `use` que los acople entre si.
+use (
+	./gateway
+	./ingestion
+)

@@ -1,4 +1,4 @@
-module github.com/JoelTeoGom/go-sharded-ws-hub
+module github.com/JoelTeoGom/go-sharded-ws-hub/gateway
 
 go 1.24
 
