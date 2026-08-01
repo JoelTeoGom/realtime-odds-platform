@@ -28,7 +28,7 @@ func (h *Hub) dump() string {
 	var b strings.Builder
 
 	totalTopics, totalSubs := 0, 0
-	for i, s := range h.shards {
+	for i, s := range h.EventShards {
 		topics := s.snapshot()
 
 		names := make([]string, 0, len(topics))
@@ -53,12 +53,12 @@ func (h *Hub) dump() string {
 	return header + b.String()
 }
 
-func (s *Shard) snapshot() map[string][]string {
+func (s *EventShard) snapshot() map[string][]string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	out := make(map[string][]string, len(s.subs))
-	for topic, clients := range s.subs {
+	out := make(map[string][]string, len(s.eventSubsMap))
+	for topic, clients := range s.eventSubsMap {
 		ids := make([]string, 0, len(clients))
 		for id := range clients {
 			ids = append(ids, id)

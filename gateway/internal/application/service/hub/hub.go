@@ -5,12 +5,11 @@ import (
 	"hash/fnv"
 
 	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/application/ports/inbound"
-	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/ports/outbound"
+	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/application/ports/outbound"
 )
 
 type Hub struct {
 	EventShards []*EventShard
-	UserShard   []*UserShard
 	nShards     int
 }
 
@@ -22,16 +21,13 @@ func NewHub(nShards int) *Hub {
 	}
 
 	eventShards := make([]*EventShard, nShards)
-	userShards := make([]*UserShard, nShards)
 	for i := 0; i < nShards; i++ {
 		eventShards[i] = newEventShard()
-		userShards[i] = newUserShard()
 	}
 
 	h := &Hub{
 		nShards:     nShards,
 		EventShards: eventShards,
-		UserShard:   userShards,
 	}
 
 	// debug only: dumps the shard maps every 10s.
@@ -40,11 +36,10 @@ func NewHub(nShards int) *Hub {
 	return h
 }
 
-// shardFor always maps a topic to the same shard.
-func (h *Hub) shardFor(topic string) *UserShard {
+func (h *Hub) shardFor(topic string) *EventShard {
 	sum := fnv.New32a()
 	_, _ = sum.Write([]byte(topic))
-	return h.UserShard[sum.Sum32()%uint32(h.nShards)]
+	return h.EventShards[sum.Sum32()%uint32(h.nShards)]
 }
 
 func (h *Hub) Subscribe(c outbound.Connection, topics ...string) {

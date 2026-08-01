@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/ports/inbound"
+	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/application/ports/inbound"
 	"github.com/gorilla/websocket"
 )
 
@@ -42,10 +42,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		wsConn.Close()
 	}()
-
-	if err := h.hub.Register(conn); err != nil {
-		return
-	}
 
 	go wsConn.readPump(h.hub)
 	wsConn.writePump(h.hub)
