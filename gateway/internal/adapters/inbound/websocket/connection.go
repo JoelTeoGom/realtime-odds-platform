@@ -1,14 +1,11 @@
-package ws
+package websocket
 
 import (
 	"encoding/json"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-
-	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/ports/inbound"
 )
 
 const (
@@ -19,14 +16,22 @@ const (
 	sendBuffer = 256
 )
 
-type Client struct {
+type Connection struct {
 	id   string
 	conn *websocket.Conn
-	hub  inbound.Hub
-
 	send chan []byte
+
 	once sync.Once
-	done chan struct{} // closed by Close, unblocks writePump
+	done chan struct{}
+}
+
+func newWsConnection(id string, conn *websocket.Conn) *Connection {
+	return &Connection{
+		id:   id,
+		conn: conn,
+		send: make(chan []byte, sendBuffer),
+		done: make(chan struct{}),
+	}
 }
 
 type Command struct {
@@ -34,18 +39,8 @@ type Command struct {
 	EventID string `json:"eventId"`
 }
 
-func newClient(conn *websocket.Conn, hub inbound.Hub) *Client {
-	return &Client{
-		id:   uuid.NewString(),
-		conn: conn,
-		hub:  hub,
-		send: make(chan []byte, sendBuffer),
-		done: make(chan struct{}),
-	}
-}
-
 // Close is idempotent and unblocks both pumps.
-func (c *Client) Close() error {
+func (c *Connection) Close() error {
 	c.once.Do(func() {
 		close(c.done)
 		_ = c.conn.Close()
@@ -53,18 +48,18 @@ func (c *Client) Close() error {
 	return nil
 }
 
-func (c *Client) ID() string {
+func (c *Connection) ID() string {
 	return c.id
 }
 
-func (c *Client) Send(payload []byte) {
+func (c *Connection) Send(payload []byte) {
 	select {
 	case c.send <- payload:
 	default: //We can discard some messages NOT BLOCK
 	}
 }
 
-func (c *Client) readPump() {
+func (c *Connection) readPump() {
 	defer func() {
 		c.Close()
 	}()
@@ -89,7 +84,7 @@ func (c *Client) readPump() {
 	}
 }
 
-func (c *Client) writePump() {
+func (c *Connection) writePump() {
 	ping := time.NewTicker(pingPeriod)
 	defer func() {
 		ping.Stop()
