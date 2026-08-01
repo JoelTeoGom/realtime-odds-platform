@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/adapters/inbound/websocket"
-	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/hub"
+	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/application/service/hub"
 )
 
 func main() {

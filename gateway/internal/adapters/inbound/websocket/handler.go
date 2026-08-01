@@ -33,22 +33,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	raw, err := h.upgrader.Upgrade(w, r, nil)
+	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
 
-	conn := newWsConnection(id, raw)
+	wsConn := newWsConnection(id, conn)
+	defer func() {
+		wsConn.Close()
+	}()
 
 	if err := h.hub.Register(conn); err != nil {
-		_ = conn.Close()
-		_ = raw.Close()
-		h.log.Warn("register rejected", "client", id, "err", err)
 		return
 	}
 
-	// El writePump arranca primero: garantiza que cualquier Send() disparado
-	// por Register (p.ej. mensajes de bienvenida) tenga ya consumidor.
-	go conn.writePump()
-	go conn.readPump(h.hub, h.log)
+	go wsConn.readPump(h.hub)
+	wsConn.writePump(h.hub)
 }

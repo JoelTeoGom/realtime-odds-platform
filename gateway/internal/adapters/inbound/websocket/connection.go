@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/application/ports/inbound"
 	"github.com/gorilla/websocket"
 )
 
@@ -43,7 +44,7 @@ type Command struct {
 func (c *Connection) Close() error {
 	c.once.Do(func() {
 		close(c.done)
-		_ = c.conn.Close()
+		c.conn.Close()
 	})
 	return nil
 }
@@ -59,7 +60,7 @@ func (c *Connection) Send(payload []byte) {
 	}
 }
 
-func (c *Connection) readPump() {
+func (c *Connection) readPump(hub inbound.Hub) {
 	defer func() {
 		c.Close()
 	}()
@@ -77,14 +78,14 @@ func (c *Connection) readPump() {
 
 		switch cmd.Action {
 		case "subscribe":
-			c.hub.Subscribe(c, cmd.EventID)
+			hub.Subscribe(c, cmd.EventID)
 		case "unsubscribe":
-			c.hub.Unsubscribe(c, cmd.EventID)
+			hub.Unsubscribe(c, cmd.EventID)
 		}
 	}
 }
 
-func (c *Connection) writePump() {
+func (c *Connection) writePump(hub inbound.Hub) {
 	ping := time.NewTicker(pingPeriod)
 	defer func() {
 		ping.Stop()

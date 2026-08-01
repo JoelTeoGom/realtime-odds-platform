@@ -11,32 +11,38 @@ type EventShard struct {
 	eventSubsMap map[string][]string
 }
 
-type ClientShard struct {
+type UserShard struct {
 	mu              sync.RWMutex
-	clientSocketMap map[string]outbound.Client
+	clientSocketMap map[string]outbound.Connection
 }
 
-func newShard() *Shard {
-	return &Shard{
-		clientSocketMap: make(map[string]outbound.Client),
-		eventSubsMap:    make,
+func newUserShard() *UserShard {
+	return &UserShard{
+		clientSocketMap: make(map[string]outbound.Connection),
 		mu:              sync.RWMutex{},
 	}
 }
 
-func (s *Shard) subscribe(c outbound.Client, topic string) {
+func newEventShard() *EventShard {
+	return &EventShard{
+		eventSubsMap: make(map[string][]string),
+		mu:           sync.RWMutex{},
+	}
+}
+
+func (s *UserShard) subscribe(c outbound.Connection, topic string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	clients, ok := s.subs[topic]
+	clients, ok := s.clientSocketMap[topic]
 	if !ok {
-		clients = make(map[string]outbound.Client)
+		clients = make(map[string]outbound.Connection)
 		s.subs[topic] = clients
 	}
 	clients[c.ID()] = c
 }
 
-func (s *Shard) unsubscribe(clientID, topic string) {
+func (s *UserShard) unsubscribe(clientID, topic string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

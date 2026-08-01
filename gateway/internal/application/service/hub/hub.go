@@ -4,13 +4,13 @@ import (
 	"context"
 	"hash/fnv"
 
-	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/ports/inbound"
+	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/application/ports/inbound"
 	"github.com/JoelTeoGom/go-sharded-ws-hub/gateway/internal/ports/outbound"
 )
 
 type Hub struct {
 	EventShards []*EventShard
-	ClientShard []*ClientShard
+	UserShard   []*UserShard
 	nShards     int
 }
 
@@ -22,17 +22,16 @@ func NewHub(nShards int) *Hub {
 	}
 
 	eventShards := make([]*EventShard, nShards)
-	clientShard := make([]*ClientShard, nShards)
-	for i := range shards {
+	userShards := make([]*UserShard, nShards)
+	for i := 0; i < nShards; i++ {
 		eventShards[i] = newEventShard()
-		clientShard[i] = newClientShard()
-
+		userShards[i] = newUserShard()
 	}
 
 	h := &Hub{
 		nShards:     nShards,
 		EventShards: eventShards,
-		ClientShard: clientShards,
+		UserShard:   userShards,
 	}
 
 	// debug only: dumps the shard maps every 10s.
@@ -42,19 +41,19 @@ func NewHub(nShards int) *Hub {
 }
 
 // shardFor always maps a topic to the same shard.
-func (h *Hub) shardFor(topic string) *Shard {
+func (h *Hub) shardFor(topic string) *UserShard {
 	sum := fnv.New32a()
 	_, _ = sum.Write([]byte(topic))
-	return h.shards[sum.Sum32()%uint32(h.nShards)]
+	return h.UserShard[sum.Sum32()%uint32(h.nShards)]
 }
 
-func (h *Hub) Subscribe(c outbound.Client, topics ...string) {
+func (h *Hub) Subscribe(c outbound.Connection, topics ...string) {
 	for _, topic := range topics {
 		h.shardFor(topic).subscribe(c, topic)
 	}
 }
 
-func (h *Hub) Unsubscribe(c outbound.Client, topics ...string) {
+func (h *Hub) Unsubscribe(c outbound.Connection, topics ...string) {
 	id := c.ID()
 	for _, topic := range topics {
 		h.shardFor(topic).unsubscribe(id, topic)
