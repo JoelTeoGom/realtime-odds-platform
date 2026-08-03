@@ -1,74 +1,77 @@
-# go-sharded-ws-hub
+# realtime-odds-platform
 
-Hub de WebSockets shardeado para difundir cambios de cuotas en tiempo real.
+Real-time odds platform: ingests event updates from external providers and pushes them
+to subscribed clients over WebSocket.
 
-## Arquitectura
+Built from a system design problem I was given in a sportsbook interview. The interesting
+constraint is ordering: providers send updates for an event in order, and that order has
+to survive all the way to the client, while updates for *different* events run in parallel.
 
-![Arquitectura del hub](docs/architecture.png)
+**Status:** the gateway is working. The ingestion pipeline is in progress.
 
-**Camino de entrada (arriba).** Los clientes abren `/ws` contra el gateway. El
-handler hace el upgrade y crea un `Client` con dos goroutines: `readPump`, que
-lee los comandos del navegador (`subscribe(eventId)`), y `writePump`, la única
-que escribe en el socket. El `readPump` llama al hub, que elige shard con
-`hash(eventId) % nShards` y guarda al cliente en el mapa de ese shard.
+## Architecture
 
-**Camino de actualizaciones (abajo).** Los `eventUPDATES` externos se reparten
-por colas con el mismo criterio, `hash(eventId) % N`, para que los cambios de un
-mismo evento se procesen en orden. Los workers de fan-out publican en pub/sub, y
-cada instancia del hub recibe lo que corresponde a los eventos que tiene
-suscritos y se lo empuja a los clientes de ese shard.
+![Architecture](docs/architecture.png)
 
-## Estructura
+### Domain
 
-Monorepo con **dos servicios independientes**, cada uno su propio módulo Go y su
-propio hexágono (ports + adapters). No comparten código: se despliegan, versionan
-y escalan por separado, y se comunicarán por la red (gRPC / pub-sub).
+`Event` → `Market` → `Odd`. A provider does not resend the whole event, it sends
+`OddUpdate`, a fragment describing what changed. The whole system moves fragments, not
+snapshots.
 
-```
-go.work               solo para desarrollo local en el monorepo
+### Ingestion path
 
-gateway/              SERVICIO 1 — módulo .../go-sharded-ws-hub/gateway
-  go.mod              deps propias: gorilla/websocket, google/uuid
-  cmd/gateway/        binario que sirve /ws
-  internal/
-    domain/           su modelo: Event, Market, Odd, OddUpdate
-    ports/
-      inbound/        Hub — lo que los adapters de entrada invocan
-      outbound/       Client — lo que el hub invoca
-    hub/              Hub + Shards: registro de suscripciones y fan-out
-    adapters/
-      inbound/ws/     handler + client (gorilla/websocket)
-      inbound/grpc/   (pendiente) recibe los updates de ingestion
+External providers push event updates into **N RabbitMQ queues, routed by
+`hash(eventId) % N`**. This is the core decision: everything for one event lands in one
+queue, so it stays ordered, while different events spread across queues and process in
+parallel. One worker per queue, so a worker never has two updates for the same event in
+flight.
 
-ingestion/            SERVICIO 2 — módulo .../go-sharded-ws-hub/ingestion
-  go.mod              sin deps todavía
-  cmd/ingestion/      binario del pipeline (pendiente)
-  internal/
-    domain/           su propio modelo, independiente del de gateway
-    ports/
-      inbound/        casos de uso que disparan los adapters de entrada
-      outbound/       lo que el pipeline necesita del exterior (publisher…)
-    pipeline/         colas por hash(eventId) % N + workers de fan-out
-    adapters/
-      inbound/http/   entrada de updates externos
-      outbound/grpc/  (pendiente) cliente hacia gateway
-      outbound/redis/ (pendiente) publicación en pub/sub
-```
+Each worker does two things with an update:
 
-Reglas:
+- Writes the new state to **Redis**, which holds the current state of every event so a
+  client connecting mid-match gets a snapshot instead of waiting for the next change.
+- Publishes the fragment to **Redis Pub/Sub**, so every gateway instance subscribed to
+  that event receives it.
 
-- La dependencia va siempre hacia dentro: `hub` y `pipeline` no importan nunca
-  `adapters`.
-- **Ningún servicio importa al otro.** Cada uno tiene su copia del dominio; el
-  contrato entre ambos vive en el `.proto` / el payload, no en un paquete Go
-  compartido. Si un día cambia, se versiona el contrato, no se recompilan los dos
-  a la vez.
-- `go.work` es una comodidad local. Cada carpeta compila sola:
-  `cd gateway && go build ./...` funciona sin la otra, y podrías moverla a su
-  propio repo tal cual.
+### Gateway and fan-out
 
-## Ejecutar
+A client opens `/ws` and sends `subscribe(eventId)`. One client can subscribe to many
+events at once and receives updates for all of them over the same connection.
 
-```bash
-go run ./gateway/cmd/gateway     # levanta el ws en :8080
-```
+The hub is **sharded by `hash(eventId)`**. Inside each shard there is a map keyed by
+event id, and each entry holds the set of clients subscribed to that event. When a
+fragment arrives from Pub/Sub, the hub resolves its shard, looks up the event and pushes
+to exactly those clients.
+
+Each connection runs two goroutines: `readPump`, which reads client commands, and
+`writePump`, the only goroutine that ever writes to the socket.
+
+## Design notes
+
+**Why hash-partitioned queues.** Parallelising naively breaks ordering: two workers could
+process `score: 1` and `score: 2` for the same event out of order and leave the cache
+wrong. Partitioning by event id gives parallelism between events and serialisation within
+one. Same idea as Kafka partitions, applied to RabbitMQ.
+
+**Why shard the hub.** A single subscription map guarded by one mutex serialises every
+broadcast. Sharding by event id means updates for unrelated events never contend for the
+same lock.
+
+**Why one write pump per connection.** Gorilla WebSocket connections do not support
+concurrent writers. Funnelling every write through a single goroutine per connection
+makes fan-out safe without locking the socket.
+
+**Why a non-blocking send.** If the send blocked, one slow consumer would stall the
+broadcast for every other client subscribed to that event. Dropping the slow consumer is
+the deliberate tradeoff: availability of the fan-out over delivery to one client.
+
+**Why Redis holds state as well as transporting it.** Pub/Sub has no replay. Without the
+stored state, a client connecting between two updates would see nothing until the next
+change arrives.
+
+## Structure
+
+A monorepo with **two independent services**, each with its own Go module and its own
+hexagon (ports + adapters). They share no code: they are deployed, versioned and scaled
+separately, and communicate over the network (gRPC / pub-sub).
